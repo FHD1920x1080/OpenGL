@@ -24,16 +24,12 @@ MyBox originBox;
 void drawScene();
 void Reshape(int w, int h);
 void KeyDown(unsigned char key, int x, int y);
-void KeyUp(unsigned char key, int x, int y);
-void Mouse(int button, int state, int x, int y);
 void InitBuffer();
 void inputColor(MyBox* Obj);
 void enter();
 void reset();
 void FPS100(int value);
 
-float* cheak_collision(float x, float y, float z, MyBox Rect);
-bool check_collision_min_move(MyRobot* unit1, MyBox* unit2);
 //--- load obj related variabales
 //objRead objReader;
 //GLint Object = objReader.loadObj_normalize_center("mid_box.obj");
@@ -56,13 +52,6 @@ struct remote_control {
 
 remote_control remocon;
 
-int face_dir;
-int North = 0;
-int East = 1;
-int South = 2;
-int West = 3;
-float Pos_x = 0.0, Pos_y = 0.0, Pos_z = 0.0;
-float fall_speed = 0;
 float gravity_force = 0.2;
 MyCamera myCamera[2];
 
@@ -176,6 +165,14 @@ MyBox stone;
 GLuint room_vao, room_vbo_pos, room_vbo_color;
 MyBox room;
 
+unsigned int modelLocation;// 모델변환 유니폼
+unsigned int viewLocation;// 카메라 변환 유니폼
+unsigned int projectionLocation;// 투영 변환 유니폼
+
+unsigned int objColorLocation; // 물체 색상 유니폼
+unsigned int lightPosLocation; // 빛의 위치 유니폼
+unsigned int lightColorLocation; // 빛의 색상 유니폼
+unsigned int viewPosLocation; // 카메라 위치 유니폼 - 빛의 반사, 하이라이트를 표현 해주기 위함.
 void InitBuffer()
 {
 
@@ -212,7 +209,7 @@ void InitBuffer()
 	*/
 
 	glGenVertexArrays(1, VAO);
-	glGenBuffers(1, VBO);
+	glGenBuffers(2, VBO);
 
 	GLint pAttribute;
 	GLint nAttribute;
@@ -226,35 +223,33 @@ void InitBuffer()
 	glVertexAttribPointer(pAttribute, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
 	glEnableVertexAttribArray(pAttribute);
 
+	glBindBuffer(GL_ARRAY_BUFFER, VBO[1]);
+	glBufferData(GL_ARRAY_BUFFER, originBox.outnormal.size() * sizeof(glm::vec3), &originBox.outnormal[0], GL_STATIC_DRAW);
+
 	nAttribute = glGetAttribLocation(s_program[0], "vNormal");
-	glVertexAttribPointer(nAttribute, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)(3 * sizeof(float)));
+	glVertexAttribPointer(nAttribute, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
 	glEnableVertexAttribArray(nAttribute);
 
 	glUseProgram(s_program[0]);
-	unsigned int objColorLocation = glGetUniformLocation(s_program[0], "objectColor"); //--- object Color값 전달: (1.0, 0.5, 0.3)의 색
-	glUniform3f(objColorLocation, 1.0, 1.0, 0.3);
-	unsigned int lightPosLocation = glGetUniformLocation(s_program[0], "lightPos"); //--- lightPos 값 전달: (0.0, 0.0, 5.0);
-	glUniform3f(lightPosLocation, 0.0, 0.5, -5.0);
-	unsigned int lightColorLocation = glGetUniformLocation(s_program[0], "lightColor"); //--- lightColor 값 전달: (1.0, 1.0, 1.0) 백색
-	glUniform3f(lightColorLocation, 1.0, 1.0, 1.0);
+	objColorLocation = glGetUniformLocation(s_program[0], "objectColor"); //--- object Color값 전달: (1.0, 0.5, 0.3)의 색
+	lightPosLocation = glGetUniformLocation(s_program[0], "lightPos"); //--- lightPos 값 전달: (0.0, 0.0, 5.0);
+	lightColorLocation = glGetUniformLocation(s_program[0], "lightColor"); //--- lightColor 값 전달: (1.0, 1.0, 1.0) 백색
+	glUniform3f(lightColorLocation, 1.0, 1.0, 1.0); // 빛의 색
+	viewPosLocation = glGetUniformLocation(s_program[0], "viewPos"); //--- viewPos 값 전달: 카메라 위치
 
-
-
+	modelLocation = glGetUniformLocation(s_program[0], "modelTransform");//--- 모델 변환 설정
+	viewLocation = glGetUniformLocation(s_program[0], "viewTransform"); //--- 뷰잉 변환 설정
+	projectionLocation = glGetUniformLocation(s_program[0], "projectionTransform"); //--- 투영 변환 값 설정
 }
 glm::mat4 view = glm::mat4(1.0f);
 glm::mat4 projection = glm::mat4(1.0f);
 
-unsigned int modelLocation;
-unsigned int viewLocation;
-unsigned int projectionLocation;
-
 void drawWorld() {
-	unsigned int viewPosLocation = glGetUniformLocation(s_program[0], "viewPos"); //--- viewPos 값 전달: 카메라 위치
+	glUniform3f(lightPosLocation, 0.0, 5.0, -5.0);
 	glUniform3f(viewPosLocation, myCamera[0].Pos.x, myCamera[0].Pos.y, myCamera[0].Pos.z);
-	modelLocation = glGetUniformLocation(s_program[0], "modelTransform");//--- 모델 변환 설정
-	glm::mat4 WC = glm::mat4(1.0f);//변환행렬 초기화
 
-	glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(WC));
+	//glm::mat4 WorldConvert = glm::mat4(1.0f);//변환행렬 초기화
+	//glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(WorldConvert));
 	//glBindVertexArray(center_vao);//중앙 좌표 표시
 	//glDrawArrays(GL_LINES, 0, 2);
 	//glDrawArrays(GL_LINES, 2, 2);
@@ -262,10 +257,11 @@ void drawWorld() {
 	//glBindVertexArray(floor_vao);
 	//glDrawArrays(GL_TRIANGLES, 0, 6);
 
+	glUniform3f(objColorLocation, 1.0, 1.0, 0.3); // 물체 색
 	glBindVertexArray(VAO[0]);
 	glm::mat4 Trans = glm::mat4(1.0f);//변환행렬 초기화
 	Trans = glm::translate(Trans, glm::vec3(1.0f, 1.0f, 0.0));
-	originBox.show(&modelLocation, Trans);
+	originBox.show(&modelLocation);
 
 }
 
@@ -279,9 +275,7 @@ void MyViewport0() {
 		projection = glm::ortho(80.0f, -80.0f, -40.0f, 40.0f, 0.1f, 200.0f);
 
 	view = glm::lookAt(glm::vec3(myCamera[0].Pos), glm::vec3(myCamera[0].Dir), glm::vec3(myCamera[0].Up));
-	viewLocation = glGetUniformLocation(s_program[0], "viewTransform"); //--- 뷰잉 변환 설정
 	glUniformMatrix4fv(viewLocation, 1, GL_FALSE, &view[0][0]);
-	projectionLocation = glGetUniformLocation(s_program[0], "projectionTransform"); //--- 투영 변환 값 설정
 	glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, &projection[0][0]);
 	drawWorld();
 }
@@ -516,7 +510,8 @@ void FPS100(int value) {
 
 void enter() {
 	srand((unsigned int)time(NULL));
-	originBox.loadObj_normalize_center("1x1cube.obj");
+	originBox.loadObj_normalize_center("cube1x1x1.obj");
+	//originBox.loadObj_normalize_center("sphere1.obj");
 	inputColor(&originBox);
 }
 

@@ -62,9 +62,9 @@ public:
 			box[i].Rot.x = 0.0;
 			box[i].Rot.y = 0.0;
 			box[i].Rot.z = 0.0;
-			box[i].Scale.x = 0.0;
-			box[i].Scale.y = 0.0;
-			box[i].Scale.z = 0.0;
+			box[i].Scale.x = 1.0;
+			box[i].Scale.y = 1.0;
+			box[i].Scale.z = 1.0;
 		}
 		body.Pos.y = rightLeg.scaleY;
 		head.Pos.y = body.Pos.y + body.scaleY;
@@ -87,10 +87,8 @@ public:
 		Camera[0].Pos.y = Pos.y + 3.4;
 		Camera[0].Dir = glm::vec4(Camera[0].Pos.x, Camera[0].Pos.y, Camera[0].Pos.z + 1, 1.0f); //--- 카메라가 바라보는 방향
 	}
-	void show(glm::mat4 WC, unsigned int* modelLocation) {
+	void show(unsigned int* modelLocation, glm::mat4 WC = glm::mat4(1.0f)) {
 		//glBindVertexArray(VAO[0]);
-		glm::mat4 Scl = glm::mat4(1.0f);
-		Scl = glm::scale(Scl, glm::vec3(1.0, 1.0, 1.0));
 		for (int i = 0; i < 2; i++) {
 			glBindVertexArray(VAO[i]);
 			glm::mat4 Init = glm::mat4(1.0f);
@@ -100,9 +98,8 @@ public:
 			Init = glm::translate(Init, glm::vec3(box[i].Pos.x, box[i].Pos.y, box[i].Pos.z));
 			R_Dir = glm::rotate(R_Dir, glm::radians(Rot.y), glm::vec3(0.0, 1.0, 0.0));
 			T_Pos = glm::translate(T_Pos, glm::vec3(Pos.x, Pos.y, Pos.z));
-			Convert = T_Pos * R_Dir * Init * Scl;
-			glUniformMatrix4fv(*modelLocation, 1, GL_FALSE, glm::value_ptr(Convert));
-			box[i].show(modelLocation);
+			Convert = T_Pos * R_Dir * Init;
+			box[i].show(modelLocation, Convert);
 		}
 		for (int i = 2; i < 4; i++) {
 			glBindVertexArray(VAO[i]);
@@ -119,9 +116,8 @@ public:
 			Init = glm::translate(Init, glm::vec3(box[i].Pos.x, box[i].Pos.y, box[i].Pos.z));
 			R_Dir = glm::rotate(R_Dir, glm::radians(Rot.y), glm::vec3(0.0, 1.0, 0.0));
 			T_Pos = glm::translate(T_Pos, glm::vec3(Pos.x, Pos.y, Pos.z));
-			Convert = T_Pos * R_Dir * Init * tr2 * R_leg * tr1 * Scl;
-			glUniformMatrix4fv(*modelLocation, 1, GL_FALSE, glm::value_ptr(Convert));
-			box[i].show(modelLocation);
+			Convert = T_Pos * R_Dir * Init * tr2 * R_leg * tr1;
+			box[i].show(modelLocation, Convert);
 		}
 		for (int i = 4; i < 6; i++) {
 			glBindVertexArray(VAO[i]);
@@ -136,9 +132,8 @@ public:
 			Init = glm::translate(Init, glm::vec3(box[i].Pos.x, box[i].Pos.y, box[i].Pos.z));
 			R_Dir = glm::rotate(R_Dir, glm::radians(Rot.y), glm::vec3(0.0, 1.0, 0.0));
 			T_Pos = glm::translate(T_Pos, glm::vec3(Pos.x, Pos.y, Pos.z));
-			Convert = T_Pos * R_Dir * Init * R_Arm * rot1 * Scl;
-			glUniformMatrix4fv(*modelLocation, 1, GL_FALSE, glm::value_ptr(Convert));
-			box[i].show(modelLocation);
+			Convert = T_Pos * R_Dir * Init * R_Arm * rot1;
+			box[i].show(modelLocation, Convert);
 		}
 	}
 	void initBuffer(GLuint s_program) {
@@ -164,10 +159,10 @@ public:
 			glEnableVertexAttribArray(cAttribute);
 		}
 	}
-	
+
 	void Camera_update() {
 		float P_dx = Pos.x - Camera[0].Pos.x;
-		float P_dy = (Pos.y+ 3.4) - Camera[0].Pos.y;
+		float P_dy = (Pos.y + 3.4) - Camera[0].Pos.y;
 		float P_dz = Pos.z - Camera[0].Pos.z;
 
 		float R_dy = Rot.y - Camera[0].Rot.y;
@@ -180,7 +175,7 @@ public:
 		glm::mat4 CT = glm::mat4(1.0f);
 		glm::mat4 CR_x = glm::mat4(1.0f);
 		glm::mat4 CR_y = glm::mat4(1.0f);
-		glm::mat4 CC = glm::mat4(1.0f); 
+		glm::mat4 CC = glm::mat4(1.0f);
 		glm::vec4 sample = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
 		CR_x = glm::rotate(CR_x, glm::radians(Camera[0].Rot.x), glm::vec3(1.0, 0.0, 0.0));
 		CR_y = glm::rotate(CR_y, glm::radians(Camera[0].Rot.y), glm::vec3(0.0, 1.0, 0.0));
@@ -310,7 +305,7 @@ public:
 		leftLeg.Rot.x -= 2 * leg_rot_dir;
 		leftArm.Rot.x += 2 * leg_rot_dir;
 		rightArm.Rot.x -= 2 * leg_rot_dir;
-		if (rightLeg.Rot.x >= 30 ||rightLeg.Rot.x <= -30)
+		if (rightLeg.Rot.x >= 30 || rightLeg.Rot.x <= -30)
 			leg_rot_dir *= -1;
 	}
 

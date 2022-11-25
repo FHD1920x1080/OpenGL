@@ -139,6 +139,7 @@
   <ItemGroup>
     <ClInclude Include="myCamera.h" />
     <ClInclude Include="myBox.h" />
+    <ClInclude Include="myLight.h" />
     <ClInclude Include="myMaze.h" />
     <ClInclude Include="myRobot.h" />
     <ClInclude Include="objRead.h" />

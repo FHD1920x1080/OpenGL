@@ -55,5 +55,8 @@
     <ClInclude Include="myRobot.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="myLight.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
