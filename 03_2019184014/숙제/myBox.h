@@ -38,9 +38,11 @@ public:
 	void update() {
 		vertex_size = outvertex.size();
 	}
-	void show() {
+	void show(unsigned int* modelLocation, glm::mat4 Convert = glm::mat4(1.0f)) {
 		if (vertex_size == 0)
 			update();
+		glm::mat4 Result = glm::scale(Convert, glm::vec3(Scale.x, Scale.y, Scale.z));
+		glUniformMatrix4fv(*modelLocation, 1, GL_FALSE, glm::value_ptr(Result));
 		glDrawArrays(GL_TRIANGLES, 0, vertex_size);
 	}
 	void show_bottom() {

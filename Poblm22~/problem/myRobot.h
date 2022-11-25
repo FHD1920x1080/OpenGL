@@ -102,7 +102,7 @@ public:
 			T_Pos = glm::translate(T_Pos, glm::vec3(Pos.x, Pos.y, Pos.z));
 			Convert = T_Pos * R_Dir * Init * Scl;
 			glUniformMatrix4fv(*modelLocation, 1, GL_FALSE, glm::value_ptr(Convert));
-			box[i].show();
+			box[i].show(modelLocation);
 		}
 		for (int i = 2; i < 4; i++) {
 			glBindVertexArray(VAO[i]);
@@ -121,7 +121,7 @@ public:
 			T_Pos = glm::translate(T_Pos, glm::vec3(Pos.x, Pos.y, Pos.z));
 			Convert = T_Pos * R_Dir * Init * tr2 * R_leg * tr1 * Scl;
 			glUniformMatrix4fv(*modelLocation, 1, GL_FALSE, glm::value_ptr(Convert));
-			box[i].show();
+			box[i].show(modelLocation);
 		}
 		for (int i = 4; i < 6; i++) {
 			glBindVertexArray(VAO[i]);
@@ -138,7 +138,7 @@ public:
 			T_Pos = glm::translate(T_Pos, glm::vec3(Pos.x, Pos.y, Pos.z));
 			Convert = T_Pos * R_Dir * Init * R_Arm * rot1 * Scl;
 			glUniformMatrix4fv(*modelLocation, 1, GL_FALSE, glm::value_ptr(Convert));
-			box[i].show();
+			box[i].show(modelLocation);
 		}
 	}
 	void initBuffer(GLuint s_program) {

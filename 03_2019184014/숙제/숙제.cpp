@@ -297,8 +297,7 @@ void drawWorld() {
 	Init = glm::translate(Init, glm::vec3(meteorBox.Pos.x, meteorBox.Pos.y, meteorBox.Pos.z));
 	Convert = Init * Scale;
 	glBindVertexArray(VAO[0]);
-	glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(Convert));
-	meteorBox.show();
+	meteorBox.show(&modelLocation, Init);
 	for (int i = 0; i < maze3D.h; i++) {
 		for (int j = 0; j < maze3D.w; j++) {
 			Init = glm::mat4(1.0f);
@@ -307,11 +306,10 @@ void drawWorld() {
 			Scale = glm::scale(Scale, glm::vec3(maze3D.Map[i][j].Scale.x, maze3D.Map[i][j].Scale.y, maze3D.Map[i][j].Scale.z));
 			Init = glm::translate(Init, glm::vec3(maze3D.Map[i][j].Pos.x, maze3D.Map[i][j].Pos.y, maze3D.Map[i][j].Pos.z));
 			Convert = Init * Scale;
-			glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(Convert));
-			originBox.show();
+			maze3D.Map[i][j].show(&modelLocation, Init);
 		}
 	}
-	myRobot.show(WC, &modelLocation);
+	myRobot.show(&modelLocation);
 }
 
 void MyViewport0() {

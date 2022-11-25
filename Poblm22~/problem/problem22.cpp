@@ -263,7 +263,9 @@ void drawWorld() {
 	//glDrawArrays(GL_TRIANGLES, 0, 6);
 
 	glBindVertexArray(VAO[0]);
-	originBox.show();
+	glm::mat4 Trans = glm::mat4(1.0f);//변환행렬 초기화
+	Trans = glm::translate(Trans, glm::vec3(1.0f, 1.0f, 0.0));
+	originBox.show(&modelLocation, Trans);
 
 }
 
@@ -283,24 +285,7 @@ void MyViewport0() {
 	glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, &projection[0][0]);
 	drawWorld();
 }
-//void MyViewport1() {
-//	glViewport(g_window_w * 3 / 4, g_window_h / 2, g_window_w / 4, g_window_h / 2);
-//	//if (remocon.perspective_projection) {//원근 투영
-//	//	projection = glm::perspective(glm::radians(45.0f), -1.0f, 0.1f, 200.0f);// 맨뒤 두개는 카메라로부터 근평면 원평면 거리
-//	//	//projection = glm::translate(projection, glm::vec3(0.0, 0.0, -2.0));
-//	//}
-//	//else//직각(직교,평행) 투영
-//		projection = glm::ortho(22.0f, -22.0f, -22.0f, 22.0f, 0.1f, 200.0f);
-//
-//	//MyCamera[0].Dir = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);//카메라 보는 방향
-//	view = glm::lookAt(glm::vec3(myCamera[1].Pos), glm::vec3(myCamera[1].Dir), glm::vec3(myCamera[1].Up));
-//
-//	viewLocation = glGetUniformLocation(s_program[0], "viewTransform"); //--- 뷰잉 변환 설정
-//	glUniformMatrix4fv(viewLocation, 1, GL_FALSE, &view[0][0]);
-//	projectionLocation = glGetUniformLocation(s_program[0], "projectionTransform"); //--- 투영 변환 값 설정
-//	glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, &projection[0][0]);
-//	drawWorld();
-//}
+
 void drawScene()
 {
 	glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
@@ -517,52 +502,8 @@ void KeyDown(unsigned char key, int x, int y)
 }
 
 void anim_play() {
-	/*if (Anim.updown_anim)
-		for (int i = 0; i < maze3D.h; i++) {
-			for (int j = 0; j < maze3D.w; j++) {
-				maze3D.Map[i][j].updown();
-			}
-		}
 
-	if (Anim.meteor) {
-		meteorBox.Pos.y -= 0.05;
-		if (meteorBox.top() < 0) {
-			meteorBox.Pos.y = -meteorBox.Scale.y - 1.0;
-			Anim.meteor = 0;
-		}
-	}
-	if (Anim.make_maze) {
-		maze3D.down_maze_intensity -= 0.05;
-		for (int i = 0; i < maze2D.h; i++) {
-			for (int j = 0; j < maze2D.w; j++) {
-				if (maze2D.Map[i][j] == 0) {
-					maze3D.Map[i][j].Pos.y -= 0.05;
-				}
-			}
-		}
-		if (maze3D.down_maze_intensity < 0) {
-			Anim.make_maze = 0;
-		}
-	}
 
-	if (Anim.low_height) {
-		int n = 0;
-		for (int i = 0; i < maze3D.h; i++) {
-			for (int j = 0; j < maze3D.w; j++) {
-				if (maze3D.Map[i][j].low_state == false) {
-					n++;
-					maze3D.Map[i][j].Scale.y -= maze3D.Map[i][j].velocity;
-					if (maze3D.Map[i][j].Scale.y < maze3D.min_height) {
-						maze3D.Map[i][j].Scale.y = maze3D.min_height;
-						maze3D.Map[i][j].low_state = true;
-					}
-				}
-			}
-		}
-		if (n == 0) {
-			Anim.low_height = 0;
-		}
-	}*/
 }
 
 void FPS100(int value) {
