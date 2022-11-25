@@ -31,5 +31,8 @@
 *.out
 *.app
 *.vsidx
-Poblm22~/.vs/숙제/v17/ipch/AutoPCH/fbe01170efe00946/숙제.ipch
-*.tlog
+.vs/
+Release/
+Debug/
+x64/
+x86/
