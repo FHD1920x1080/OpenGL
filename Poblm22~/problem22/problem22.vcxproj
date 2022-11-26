@@ -131,6 +131,8 @@
   <ItemGroup>
     <ClCompile Include="objRead.cpp" />
     <ClCompile Include="problem22.cpp" />
+    <ClCompile Include="problem23.cpp" />
+    <ClCompile Include="problem24.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="fragment.glsl" />
@@ -138,9 +140,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="myCamera.h" />
-    <ClInclude Include="myBox.h" />
     <ClInclude Include="myLight.h" />
     <ClInclude Include="myMaze.h" />
+    <ClInclude Include="myObj.h" />
     <ClInclude Include="myRobot.h" />
     <ClInclude Include="objRead.h" />
     <ClInclude Include="shader.h" />

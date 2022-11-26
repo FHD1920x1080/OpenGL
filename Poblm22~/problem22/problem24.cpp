@@ -1,17 +1,28 @@
 // Reading Obj file
 #include "stdafx.h"
 #include "shader.h"
-#include "myMaze.h"
+#include "myObj.h"
+#include "myCamera.h"
+#include "myLight.h"
 #include <time.h>
-
+#include <cmath>
+#define botBox myBox[0]
+#define midBox myBox[1]
+#define topBox1 myBox[2]
+#define topBox2 myBox[3]
 using namespace std;
 
 GLuint g_window_w = 800;
 GLuint g_window_h = 800;
 GLuint VAO[4];
-GLuint VBO[4];
+GLuint VBO_pos[4];
+GLuint VBO_norm[4];
 
-MyBox originBox;
+MyObj originBox;
+MyObj myBox[4];
+MyObj pyramid;
+MyObj light_ball;
+MyLight light;
 
 //bool mazeMap[max_h][max_w];
 //MyBox maze3D.Map[max_h][max_w];
@@ -25,11 +36,10 @@ void drawScene();
 void Reshape(int w, int h);
 void KeyDown(unsigned char key, int x, int y);
 void InitBuffer();
-void inputColor(MyBox* Obj);
+void randInitColor(MyObj* Obj);
 void enter();
 void reset();
 void FPS100(int value);
-
 //--- load obj related variabales
 //objRead objReader;
 //GLint Object = objReader.loadObj_normalize_center("mid_box.obj");
@@ -48,6 +58,8 @@ struct remote_control {
 	bool polygon_mode = true;
 	bool perspective_projection = true;
 	bool first_person = false;
+	bool cube = true;
+	bool light_on = true;
 };
 
 remote_control remocon;
@@ -58,13 +70,14 @@ MyCamera myCamera[2];
 //GLint Object = objReader.loadObj_normalize_center("pyra.obj");
 //int Poly = 0;
 
-typedef struct MyMode {
-}MyMode;
+typedef struct MyAnim {
+	bool light_revolve = false;
+};
 
-MyMode Anim;
+MyAnim anim;
 
 int main(int argc, char** argv)
-{	
+{
 	// create window using freeglut
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
@@ -111,7 +124,7 @@ int main(int argc, char** argv)
 	glutReshapeFunc(Reshape);
 	glutKeyboardFunc(KeyDown);
 	//glutTimerFunc(10, gravity, 1);
-	//glutTimerFunc(10, FPS100, 1);
+	glutTimerFunc(10, FPS100, 1);
 	//glutTimerFunc(10, anim_1, 1);
 	// freeglut 윈도우 이벤트 처리 시작. 윈도우가 닫힐때까지 후한루프 실행.
 	glutMainLoop();
@@ -119,7 +132,7 @@ int main(int argc, char** argv)
 	return 0;
 }
 
-GLuint center_vao, center_vbo_pos, center_vbo_color;
+GLuint center_vao, center_vbo_pos;
 
 GLfloat center_vPos[6][3] = {
 	-1.0, 0.0, 0.0,
@@ -130,42 +143,29 @@ GLfloat center_vPos[6][3] = {
 	0.0, 0.0, 1.0
 };
 
-GLfloat center_vColor[6][3] = {
-	1.0, 0.0, 0.0,
-	1.0, 0.0, 0.0,
-	0.0, 1.0, 0.0,
-	0.0, 1.0, 0.0,
-	0.0, 0.0, 1.0,
-	0.0, 0.0, 1.0
-};
-
-GLuint floor_vao, floor_vbo_pos, floor_vbo_color;
+GLuint floor_vao, floor_vbo_pos, floor_vbo_norm;
 
 GLfloat floor_vPos[6][3] = {
-	-200.0, -0.001, -200.0,
-	-200.0, -0.001, 200.0,
-	200.0, -0.001, -200.0,
-	200.0, -0.001, -200.0,
-	-200.0, -0.001, 200.0,
-	200.0, -0.001, 200.0
+	-2.0, -0.001, -2.0,
+	-2.0, -0.001, 2.0,
+	2.0, -0.001, -2.0,
+	2.0, -0.001, -2.0,
+	-2.0, -0.001, 2.0,
+	2.0, -0.001, 2.0
+};
+GLfloat floor_vNomal[6][3] = {
+	0.0, 1.0, 0.0,
+	0.0, 1.0, 0.0,
+	0.0, 1.0, 0.0,
+	0.0, 1.0, 0.0,
+	0.0, 1.0, 0.0,
+	0.0, 1.0, 0.0
 };
 
-GLfloat floor_vColor[6][3] = {
-	0.3, 0.3, 0.3,
-	0.3, 0.3, 0.3,
-	0.3, 0.3, 0.3,
-	0.3, 0.3, 0.3,
-	0.3, 0.3, 0.3,
-	0.3, 0.3, 0.3
-};
-
-GLuint stone_vao, stone_vbo_pos, stone_vbo_color;
-MyBox stone;
-
-GLuint room_vao, room_vbo_pos, room_vbo_color;
-MyBox room;
+GLuint light_ball_vao, light_ball_vbo_pos;
 
 unsigned int modelLocation;// 모델변환 유니폼
+unsigned int modelRotateLocation;// 모델변환 유니폼
 unsigned int viewLocation;// 카메라 변환 유니폼
 unsigned int projectionLocation;// 투영 변환 유니폼
 
@@ -175,11 +175,11 @@ unsigned int lightColorLocation; // 빛의 색상 유니폼
 unsigned int viewPosLocation; // 카메라 위치 유니폼 - 빛의 반사, 하이라이트를 표현 해주기 위함.
 void InitBuffer()
 {
-
+	GLint pAttribute = glGetAttribLocation(s_program[0], "vPos");
+	GLint nAttribute = glGetAttribLocation(s_program[0], "vNormal");
 	//// 5.1. VAO 객체 생성 및 바인딩
-	/*glGenVertexArrays(1, &center_vao);
+	glGenVertexArrays(1, &center_vao);
 	glGenBuffers(1, &center_vbo_pos);
-	glGenBuffers(1, &center_vbo_color);
 	glBindVertexArray(center_vao);
 
 	glBindBuffer(GL_ARRAY_BUFFER, center_vbo_pos);
@@ -187,82 +187,127 @@ void InitBuffer()
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
 	glEnableVertexAttribArray(0);
 
-	glBindBuffer(GL_ARRAY_BUFFER, center_vbo_color);
-	glBufferData(GL_ARRAY_BUFFER, 6 * 3 * sizeof(float), center_vColor, GL_STATIC_DRAW);
-	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
-	glEnableVertexAttribArray(2);
-
 	glGenVertexArrays(1, &floor_vao);
 	glGenBuffers(1, &floor_vbo_pos);
-	glGenBuffers(1, &floor_vbo_color);
+	glGenBuffers(1, &floor_vbo_norm);
 	glBindVertexArray(floor_vao);
 
 	glBindBuffer(GL_ARRAY_BUFFER, floor_vbo_pos);
 	glBufferData(GL_ARRAY_BUFFER, 6 * 3 * sizeof(float), floor_vPos, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
-	glEnableVertexAttribArray(0);
-
-	glBindBuffer(GL_ARRAY_BUFFER, floor_vbo_color);
-	glBufferData(GL_ARRAY_BUFFER, 6 * 3 * sizeof(float), floor_vColor, GL_STATIC_DRAW);
-	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
-	glEnableVertexAttribArray(2);
-	*/
-
-	glGenVertexArrays(1, VAO);
-	glGenBuffers(2, VBO);
-
-	GLint pAttribute;
-	GLint nAttribute;
-	glBindVertexArray(VAO[0]);
-
-	//---위치속성
-	glBindBuffer(GL_ARRAY_BUFFER, VBO[0]);
-	glBufferData(GL_ARRAY_BUFFER, originBox.outvertex.size() * sizeof(glm::vec3), &originBox.outvertex[0], GL_STATIC_DRAW);
-
-	pAttribute = glGetAttribLocation(s_program[0], "vPos");
 	glVertexAttribPointer(pAttribute, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
 	glEnableVertexAttribArray(pAttribute);
 
-	glBindBuffer(GL_ARRAY_BUFFER, VBO[1]);
-	glBufferData(GL_ARRAY_BUFFER, originBox.outnormal.size() * sizeof(glm::vec3), &originBox.outnormal[0], GL_STATIC_DRAW);
-
-	nAttribute = glGetAttribLocation(s_program[0], "vNormal");
+	glBindBuffer(GL_ARRAY_BUFFER, floor_vbo_norm);
+	glBufferData(GL_ARRAY_BUFFER, 6 * 3 * sizeof(float), floor_vNomal, GL_STATIC_DRAW);
 	glVertexAttribPointer(nAttribute, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
 	glEnableVertexAttribArray(nAttribute);
+
+	glGenVertexArrays(4, VAO);
+	glGenBuffers(4, VBO_pos);
+	//glGenBuffers(4, VBO_normal);
+	glGenBuffers(4, VBO_norm);
+	// 2 triangles for quad floor
+	for (int i = 0; i < 4; i++) {
+		glBindVertexArray(VAO[i]);
+		//---위치속성
+		glBindBuffer(GL_ARRAY_BUFFER, VBO_pos[i]);
+		glBufferData(GL_ARRAY_BUFFER, myBox[i].outvertex.size() * sizeof(glm::vec3), &myBox[i].outvertex[0], GL_STATIC_DRAW);
+
+		glVertexAttribPointer(pAttribute, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+		glEnableVertexAttribArray(pAttribute);
+
+		//---색상속성
+		glBindBuffer(GL_ARRAY_BUFFER, VBO_norm[i]);
+		glBufferData(GL_ARRAY_BUFFER, myBox[i].outnormal.size() * sizeof(glm::vec3), &myBox[i].outnormal[0], GL_STATIC_DRAW);
+
+		glVertexAttribPointer(nAttribute, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+		glEnableVertexAttribArray(nAttribute);
+	}
+
+	glGenVertexArrays(1, &light_ball_vao);
+	glGenBuffers(1, &light_ball_vbo_pos);
+	glBindVertexArray(light_ball_vao);
+	glBindBuffer(GL_ARRAY_BUFFER, light_ball_vbo_pos);
+	glBufferData(GL_ARRAY_BUFFER, light_ball.outvertex.size() * sizeof(glm::vec3), &light_ball.outvertex[0], GL_STATIC_DRAW);
+	glVertexAttribPointer(pAttribute, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+	glEnableVertexAttribArray(pAttribute);
 
 	glUseProgram(s_program[0]);
 	objColorLocation = glGetUniformLocation(s_program[0], "objectColor"); //--- object Color값 전달: (1.0, 0.5, 0.3)의 색
 	lightPosLocation = glGetUniformLocation(s_program[0], "lightPos"); //--- lightPos 값 전달: (0.0, 0.0, 5.0);
 	lightColorLocation = glGetUniformLocation(s_program[0], "lightColor"); //--- lightColor 값 전달: (1.0, 1.0, 1.0) 백색
-	glUniform3f(lightColorLocation, 1.0, 1.0, 1.0); // 빛의 색
 	viewPosLocation = glGetUniformLocation(s_program[0], "viewPos"); //--- viewPos 값 전달: 카메라 위치
 
 	modelLocation = glGetUniformLocation(s_program[0], "modelTransform");//--- 모델 변환 설정
+	modelRotateLocation = glGetUniformLocation(s_program[0], "modelRotation");
 	viewLocation = glGetUniformLocation(s_program[0], "viewTransform"); //--- 뷰잉 변환 설정
 	projectionLocation = glGetUniformLocation(s_program[0], "projectionTransform"); //--- 투영 변환 값 설정
 }
 glm::mat4 view = glm::mat4(1.0f);
 glm::mat4 projection = glm::mat4(1.0f);
-
+float Distance(MyObj ob1, MyObj ob2) {
+	return sqrt(pow(ob2.Pos.x - ob1.Pos.x, 2) + pow(ob2.Pos.z - ob1.Pos.z, 2));
+}
 void drawWorld() {
-	glUniform3f(lightPosLocation, 0.0, 5.0, -5.0);
-	glUniform3f(viewPosLocation, myCamera[0].Pos.x, myCamera[0].Pos.y, myCamera[0].Pos.z);
+	if (remocon.light_on)
+		glUniform3f(lightColorLocation, light.Color.x, light.Color.y, light.Color.z); // 빛의 색
+	else
+		glUniform3f(lightColorLocation, 0.0, 0.0, 0.0); // 빛의 색
+	glUniform3f(lightPosLocation, light.Pos.x, light.Pos.y, light.Pos.z); // 빛의 위치
+	glUniform3f(viewPosLocation, myCamera[0].Pos.x, myCamera[0].Pos.y, myCamera[0].Pos.z); // 카메라 위치
 
-	//glm::mat4 WorldConvert = glm::mat4(1.0f);//변환행렬 초기화
-	//glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(WorldConvert));
-	//glBindVertexArray(center_vao);//중앙 좌표 표시
-	//glDrawArrays(GL_LINES, 0, 2);
-	//glDrawArrays(GL_LINES, 2, 2);
-	//glDrawArrays(GL_LINES, 4, 2);
-	//glBindVertexArray(floor_vao);
-	//glDrawArrays(GL_TRIANGLES, 0, 6);
+	glm::mat4 WorldConvert = glm::mat4(1.0f);//변환행렬 초기화
+	glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(WorldConvert));
+	glBindVertexArray(center_vao);//중앙 좌표 표시
+	glUniform3f(objColorLocation, 1.0, 0.0, 0.0);
+	glDrawArrays(GL_LINES, 0, 2);
+	glUniform3f(objColorLocation, 0.0, 1.0, 0.0);
+	glDrawArrays(GL_LINES, 2, 2);
+	glUniform3f(objColorLocation, 0.0, 0.0, 1.0);
+	glDrawArrays(GL_LINES, 4, 2);
 
-	glUniform3f(objColorLocation, 1.0, 1.0, 0.3); // 물체 색
-	glBindVertexArray(VAO[0]);
-	glm::mat4 Trans = glm::mat4(1.0f);//변환행렬 초기화
-	Trans = glm::translate(Trans, glm::vec3(1.0f, 1.0f, 0.0));
-	originBox.show(&modelLocation);
+	glUniform3f(objColorLocation, 0.3, 0.2, 0.0);
+	glBindVertexArray(floor_vao);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
 
+	glBindVertexArray(light_ball_vao);
+	glUniform3f(objColorLocation, light_ball.Color.x, light_ball.Color.y, light_ball.Color.z); // 물체 색
+	glm::mat4 Light_Trans = glm::mat4(1.0f);//변환행렬 초기화
+	Light_Trans = glm::translate(Light_Trans, glm::vec3(light.Pos.x, light.Pos.y, light.Pos.z));
+	light_ball.show(&modelLocation, Light_Trans);
+
+	glUniformMatrix4fv(modelRotateLocation, 1, GL_FALSE, glm::value_ptr(WorldConvert));
+	for (int i = 0; i < 2; i++) {
+		glBindVertexArray(VAO[i]);
+		glUniform3f(objColorLocation, myBox[i].Color.x, myBox[i].Color.y, myBox[i].Color.z);
+		glm::mat4 R0 = glm::mat4(1.0f);
+		glm::mat4 T0 = glm::mat4(1.0f);
+		glm::mat4 C0 = glm::mat4(1.0f);//변환행렬 초기화
+		T0 = glm::translate(T0, glm::vec3(botBox.Pos.x, myBox[i].Pos.y, botBox.Pos.z));
+		R0 = glm::rotate(R0, glm::radians(myBox[i].Rot.y), glm::vec3(0.0, 1.0, 0.0));
+		C0 = T0 * R0;
+		glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(C0));
+
+		myBox[i].show(&modelLocation, C0);
+	}
+	for (int i = 2; i < 4; i++) {
+		glBindVertexArray(VAO[i]);
+		glUniform3f(objColorLocation, myBox[i].Color.x, myBox[i].Color.y, myBox[i].Color.z);
+		glm::mat4 R0 = glm::mat4(1.0f);
+		glm::mat4 R1 = glm::mat4(1.0f);
+		glm::mat4 T0 = glm::mat4(1.0f);
+		glm::mat4 T1 = glm::mat4(1.0f);
+		glm::mat4 C0 = glm::mat4(1.0f);//변환행렬 초기화
+		T0 = glm::translate(T0, glm::vec3(myBox[i].Pos.x, myBox[i].Pos.y, myBox[i].Pos.z));
+		T1 = glm::translate(T1, glm::vec3(botBox.Pos.x, 0.0f, botBox.Pos.z));
+		R0 = glm::rotate(R0, glm::radians(myBox[i].Rot.x), glm::vec3(1.0, 0.0, 0.0));
+		R0 = glm::rotate(R0, glm::radians(myBox[i].Rot.y), glm::vec3(0.0, 1.0, 0.0));
+		R0 = glm::rotate(R0, glm::radians(myBox[i].Rot.z), glm::vec3(0.0, 0.0, 1.0));
+		R1 = glm::rotate(R1, glm::radians(midBox.Rot.y), glm::vec3(0.0, 1.0, 0.0));
+		C0 = T1 * R1 * T0 * R0;
+
+		myBox[i].show(&modelLocation, C0);
+	}
 }
 
 void MyViewport0() {
@@ -272,7 +317,7 @@ void MyViewport0() {
 	if (remocon.perspective_projection)
 		projection = glm::perspective(glm::radians(45.0f), -1.0f, 0.1f, 200.0f);// 맨뒤 두개는 카메라로부터 근평면 원평면 거리
 	else
-		projection = glm::ortho(80.0f, -80.0f, -40.0f, 40.0f, 0.1f, 200.0f);
+		projection = glm::ortho(40.0f, -40.0f, -40.0f, 40.0f, 0.1f, 200.0f);
 
 	view = glm::lookAt(glm::vec3(myCamera[0].Pos), glm::vec3(myCamera[0].Dir), glm::vec3(myCamera[0].Up));
 	glUniformMatrix4fv(viewLocation, 1, GL_FALSE, &view[0][0]);
@@ -282,7 +327,7 @@ void MyViewport0() {
 
 void drawScene()
 {
-	glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glUseProgram(s_program[0]);
@@ -296,8 +341,8 @@ void drawScene()
 	else
 		glDisable(GL_DEPTH_TEST);
 
-	glEnable(GL_CULL_FACE);
-	glFrontFace(GL_CW);
+	//glEnable(GL_CULL_FACE);
+	//glFrontFace(GL_CW);
 
 	MyViewport0();
 	//MyViewport1();
@@ -319,10 +364,77 @@ void KeyDown(unsigned char key, int x, int y)
 		exit(0);
 		break;
 	case '1':
-		remocon.first_person = true;
+		light.Color = glm::vec3(1.0, 0.0, 0.0);
+		break;
+	case '2':
+		light.Color = glm::vec3(0.0, 1.0, 0.0);
 		break;
 	case '3':
-		remocon.first_person = false;
+		light.Color = glm::vec3(0.0, 0.0, 1.0);
+		break;
+	case '`':
+		light.Color = glm::vec3(1.0, 1.0, 1.0);
+		break;
+	case 'M':
+	case 'm':
+		if (remocon.light_on) {
+			remocon.light_on = false;
+			break;
+		}
+		remocon.light_on = true;
+		break;
+	case 'S':
+	case 's':
+		if (anim.light_revolve) {
+			anim.light_revolve = false;
+			break;
+		}
+		anim.light_revolve = true;
+		break;
+	case '\'':
+		for (int i = 0; i < 1; i++) {
+			glm::mat4 LR = glm::mat4(1.0f);
+			glm::mat4 LT = glm::mat4(1.0f);
+			glm::mat4 LRr = glm::mat4(1.0f);
+			LR = glm::rotate(LR, glm::radians(-light.Rot.y), glm::vec3(0.0, 1.0, 0.0));
+			LT = glm::translate(LT, glm::vec3(0.0, 0.0, 0.01));
+			LRr = glm::rotate(LRr, glm::radians(light.Rot.y), glm::vec3(0.0, 1.0, 0.0));
+			glm::mat4 LC = LRr * LT * LR;
+			light.Pos = LC * light.Pos;
+		}
+		break;
+	case '/':
+		for (int i = 0; i < 1; i++) {
+			glm::mat4 LR = glm::mat4(1.0f);
+			glm::mat4 LT = glm::mat4(1.0f);
+			glm::mat4 LRr = glm::mat4(1.0f);
+			LR = glm::rotate(LR, glm::radians(-light.Rot.y), glm::vec3(0.0, 1.0, 0.0));
+			LT = glm::translate(LT, glm::vec3(0.0, 0.0, -0.01));
+			LRr = glm::rotate(LRr, glm::radians(light.Rot.y), glm::vec3(0.0, 1.0, 0.0));
+			glm::mat4 LC = LRr * LT * LR;
+			light.Pos = LC * light.Pos;
+		}
+		break;
+	case 'Y':
+	case 'y':
+		originBox.Rot.y++;
+		pyramid.Rot.y++;
+		break;
+	case 'R':
+	case 'r':
+		for (int i = 0; i < 1; i++) {
+			glm::mat4 LT = glm::mat4(1.0f);
+			glm::mat4 LR = glm::mat4(1.0f);
+			glm::mat4 LTr = glm::mat4(1.0f);//변환행렬 초기화
+			float Dx, Dy, Dz;
+			Dx = originBox.Pos.x, Dy = originBox.Pos.y, Dz = originBox.Pos.z;
+			LT = glm::translate(LT, glm::vec3(-Dx, -Dy, -Dz));
+			LR = glm::rotate(LR, glm::radians(1.0f), glm::vec3(0.0, 1.0, 0.0));
+			light.Rot.y += 1.0;
+			LTr = glm::translate(LTr, glm::vec3(Dx, Dy, Dz));
+			glm::mat4 LC = LTr * LR * LT;
+			light.Pos = LC * light.Pos;
+		}
 		break;
 	case 'I':
 	case 'i':
@@ -426,7 +538,7 @@ void KeyDown(unsigned char key, int x, int y)
 			Px = myCamera[i].Pos.x, Py = myCamera[i].Pos.y, Pz = myCamera[i].Pos.z;
 			CT = glm::translate(CT, glm::vec3(-Px, -Py, -Pz));
 			CR = glm::rotate(CR, glm::radians(-myCamera[i].Rot.y), glm::vec3(0.0, 1.0, 0.0));
-			CT1 = glm::translate(CT1, glm::vec3(0.0f, 0.0f, 0.5f));
+			CT1 = glm::translate(CT1, glm::vec3(0.0f, 0.0f, 0.1f));
 			CRr = glm::rotate(CRr, glm::radians(myCamera[i].Rot.y), glm::vec3(0.0, 1.0, 0.0));
 			CTr = glm::translate(CTr, glm::vec3(Px, Py, Pz));
 			CC = CTr * CRr * CT1 * CR * CT;
@@ -445,7 +557,7 @@ void KeyDown(unsigned char key, int x, int y)
 			Px = myCamera[i].Pos.x, Py = myCamera[i].Pos.y, Pz = myCamera[i].Pos.z;
 			CT = glm::translate(CT, glm::vec3(-Px, -Py, -Pz));
 			CR = glm::rotate(CR, glm::radians(-myCamera[i].Rot.y), glm::vec3(0.0, 1.0, 0.0));
-			CT1 = glm::translate(CT1, glm::vec3(0.0f, 0.0f, -0.5f));
+			CT1 = glm::translate(CT1, glm::vec3(0.0f, 0.0f, -0.1f));
 			CRr = glm::rotate(CRr, glm::radians(myCamera[i].Rot.y), glm::vec3(0.0, 1.0, 0.0));
 			CTr = glm::translate(CTr, glm::vec3(Px, Py, Pz));
 			CC = CTr * CRr * CT1 * CR * CT;
@@ -464,7 +576,7 @@ void KeyDown(unsigned char key, int x, int y)
 			Px = myCamera[i].Pos.x, Py = myCamera[i].Pos.y, Pz = myCamera[i].Pos.z;
 			CT = glm::translate(CT, glm::vec3(-Px, -Py, -Pz));
 			CR = glm::rotate(CR, glm::radians(-myCamera[i].Rot.y), glm::vec3(0.0, 1.0, 0.0));
-			CT1 = glm::translate(CT1, glm::vec3(-0.5f, 0.0f, 0.0f));
+			CT1 = glm::translate(CT1, glm::vec3(-0.1f, 0.0f, 0.0f));
 			CRr = glm::rotate(CRr, glm::radians(myCamera[i].Rot.y), glm::vec3(0.0, 1.0, 0.0));
 			CTr = glm::translate(CTr, glm::vec3(Px, Py, Pz));
 			CC = CTr * CRr * CT1 * CR * CT;
@@ -483,7 +595,7 @@ void KeyDown(unsigned char key, int x, int y)
 			Px = myCamera[i].Pos.x, Py = myCamera[i].Pos.y, Pz = myCamera[i].Pos.z;
 			CT = glm::translate(CT, glm::vec3(-Px, -Py, -Pz));
 			CR = glm::rotate(CR, glm::radians(-myCamera[i].Rot.y), glm::vec3(0.0, 1.0, 0.0));
-			CT1 = glm::translate(CT1, glm::vec3(0.5f, 0.0f, 0.0f));
+			CT1 = glm::translate(CT1, glm::vec3(0.1f, 0.0f, 0.0f));
 			CRr = glm::rotate(CRr, glm::radians(myCamera[i].Rot.y), glm::vec3(0.0, 1.0, 0.0));
 			CTr = glm::translate(CTr, glm::vec3(Px, Py, Pz));
 			CC = CTr * CRr * CT1 * CR * CT;
@@ -492,17 +604,28 @@ void KeyDown(unsigned char key, int x, int y)
 		}
 		break;
 	}
-	glutPostRedisplay();
 }
 
 void anim_play() {
-
+	if (anim.light_revolve) {
+		glm::mat4 LT = glm::mat4(1.0f);
+		glm::mat4 LR = glm::mat4(1.0f);
+		glm::mat4 LTr = glm::mat4(1.0f);//변환행렬 초기화
+		float Dx, Dy, Dz;
+		Dx = originBox.Pos.x, Dy = originBox.Pos.y, Dz = originBox.Pos.z;
+		LT = glm::translate(LT, glm::vec3(-Dx, -Dy, -Dz));
+		LR = glm::rotate(LR, glm::radians(1.0f), glm::vec3(0.0, 1.0, 0.0));
+		light.Rot.y += 1.0;
+		LTr = glm::translate(LTr, glm::vec3(Dx, Dy, Dz));
+		glm::mat4 LC = LTr * LR * LT;
+		light.Pos = LC * light.Pos;
+	}
 
 }
 
 void FPS100(int value) {
 	anim_play();
-	
+
 
 	glutPostRedisplay();
 	glutTimerFunc(10, FPS100, 1);
@@ -510,30 +633,38 @@ void FPS100(int value) {
 
 void enter() {
 	srand((unsigned int)time(NULL));
-	originBox.loadObj_normalize_center("cube1x1x1.obj");
-	//originBox.loadObj_normalize_center("sphere1.obj");
-	inputColor(&originBox);
+	light_ball.loadObj_normalize_center("sphere_center.obj");
+	light_ball.Scale = glm::vec3(0.3, 0.3, 0.3);
+	light_ball.Color = glm::vec3(1.0, 1.0, 1.0);
+	light.Pos = glm::vec4(0.0, 1.0, -2.0, 1.0);
+	originBox.loadObj_normalize_center("cube_ground.obj");
+	for (int i = 0; i < 4; i++) {
+		myBox[i] = originBox;
+	}
+	botBox.Scale = glm::vec3(0.6, 0.2, 0.6);
+	midBox.Scale = glm::vec3(0.3, 0.1, 0.3);
+	topBox1.Scale = glm::vec3(0.07, 0.2, 0.07);
+	topBox2.Scale = glm::vec3(0.07, 0.2, 0.07);
+	midBox.Pos.y = botBox.Scale.y;
+	topBox1.Pos.y = midBox.Pos.y + midBox.Scale.y;
+	topBox2.Pos.y = topBox1.Pos.y;
+	topBox1.Pos.x -= 0.08;
+	topBox2.Pos.x += 0.08;
+	botBox.Color = glm::vec3(1.0, 0.0, 0.0);
+	midBox.Color = glm::vec3(0.0, 1.0, 0.0);
+	topBox1.Color = glm::vec3(0.0, 0.0, 1.0);
+	topBox2.Color = glm::vec3(0.0, 0.0, 1.0);
+	myCamera[0].Pos = glm::vec4(0.0, 2.0, -5.0, 1.0);
 }
-
 void reset() {
 
 }
 
-void inputColor(MyBox* Obj) {
+void randInitColor(MyObj* Obj) {
 	glm::vec3 input;
 	double max = 32767;
 	input[0] = rand() / max;
 	input[1] = rand() / max;
 	input[2] = rand() / max;
-	input[0] += 0.6;
-	if (input[0] > 1.0)
-		input[0] = 1.0;
-	int size = Obj->vertexIndices.size();
-	for (int i = 0; i < 6; i++) {
-		for (int j = 0; j < 6; j++) {
-			Obj->outcolor.push_back(input);
-		}
-		input[0] -= 0.1;
-	}
-
+	Obj->Color = input;
 }
